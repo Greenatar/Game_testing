@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Демо Центру Управління Польотами</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Кастомні стилі */
+        body {
+            font-family: 'Inter', sans-serif; /* Основний шрифт */
+            background-color: #111827; /* tailwind gray-900 */
+            color: #E5E7EB; /* tailwind gray-200 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top for scrollable content */
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem; /* Відступ для тіла сторінки */
+            overflow-x: hidden; /* Запобігання горизонтальному скролу */
+        }
+        /* Шрифт для панелі управління */
+        .control-panel-font {
+            font-family: 'Roboto Mono', monospace;
+        }
+        /* Стилі для індикаторів статусу */
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 8px;
+            vertical-align: middle;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 0 5px rgba(255,255,255,0.3); /* Легке світіння */
+        }
+        .status-green { background-color: #34D399; /* tailwind green-400 */ }
+        .status-yellow { background-color: #FBBF24; /* tailwind yellow-400 */ }
+        .status-red { background-color: #F87171; /* tailwind red-400 */ }
+
+        /* Стилі для блоку журналу */
+        .log-box {
+            height: 220px; /* Збільшена висота для журналу в демо-режимі */
+            overflow-y: auto; /* Додавання скролу при переповненні */
+            border: 1px solid #374151; /* tailwind gray-700 */
+            padding: 0.75rem; /* p-3 */
+            background-color: #1F2937; /* tailwind gray-800 */
+            border-radius: 0.375rem; /* rounded-md */
+        }
+        .log-box p {
+            margin-bottom: 0.35rem;
+            font-size: 0.8rem; /* трохи менший текст для логів */
+            line-height: 1.4;
+        }
+        /* Кольори для типів повідомлень в журналі */
+        .log-info { color: #9CA3AF; /* tailwind gray-400 */ }
+        .log-warning { color: #FBBF24; /* tailwind yellow-400 */ }
+        .log-error { color: #F87171; /* tailwind red-400 */ }
+        .log-system { color: #60A5FA; /* tailwind blue-400 */ }
+        .log-success { color: #34D399; /* tailwind green-400 */}
+
+        /* Стилі для модального вікна */
+        .modal {
+            position: fixed; /* Фіксована позиція */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.85); /* Напівпрозорий фон, трохи темніший */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Вище за інші елементи */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease; /* Плавніша анімація */
+        }
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background-color: #B91C1C; /* tailwind red-700, більш насичений для проблеми */
+            color: white;
+            padding: 2.5rem; /* p-10, більше простору */
+            border-radius: 0.5rem; /* rounded-lg */
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); /* shadow-xl */
+            transform: scale(0.9);
+            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* Ефект "вистрибування" */
+        }
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+        .modal-content h2 {
+            font-size: 3rem; /* text-5xl, ще більший для ефекту */
+            font-weight: bold;
+            margin-bottom: 1.5rem; /* mb-6 */
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
+            letter-spacing: 0.05em;
+        }
+        .modal-content p { /* Стиль для опису проблеми в модальному вікні */
+            font-size: 1.125rem; /* text-lg */
+            line-height: 1.6;
+        }
+
+        /* Анімація для SVG (космічних апаратів) */
+        #spacecraft-orbit-group-1 { /* Перший апарат (жовтий, кругова орбіта) */
+            animation: orbitPath1 30s linear infinite;
+            transform-origin: center;
+        }
+        #spacecraft-orbit-group-2 { /* Другий апарат (зелений, кругова орбіта) */
+            animation: orbitPath2 20s linear infinite; /* Швидша орбіта */
+            transform-origin: center;
+        }
+        /* Третій апарат (червоний, еліптична орбіта) анімується через SVG <animateMotion> */
+
+        @keyframes orbitPath1 {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        @keyframes orbitPath2 {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        #flight-path-container svg {
+            overflow: visible; /* Дозволяє елементам виходити за межі SVG */
+        }
+    </style>
+</head>
+<body>
+    <div id="mission-control-interface" class="w-full max-w-screen-xl mx-auto p-3 sm:p-4 md:p-6 bg-gray-800 shadow-2xl rounded-lg control-panel-font">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            <div class="lg:col-span-1 space-y-4">
+                <header class="text-center py-3 border-b-2 border-blue-500 rounded-t-md bg-gray-700/50">
+                    <h1 class="text-xl sm:text-2xl font-bold text-blue-300 uppercase tracking-wider">ЦЕНТР УПРАВЛІННЯ (ДЕМО)</h1>
+                    <div id="mission-timer" class="text-md sm:text-lg text-gray-300 mt-1">ЧАС МІСІЇ: 00:00:00</div>
+                </header>
+
+                <section id="telemetry-panel" class="bg-gray-700 p-3 sm:p-4 rounded-md shadow-lg">
+                    <h2 class="text-lg sm:text-xl font-semibold mb-3 text-teal-300 border-b border-gray-600 pb-2">ТЕЛЕМЕТРІЯ</h2>
+                    <div class="space-y-2 text-xs sm:text-sm">
+                        <p>ВИСОТА: <span id="altitude" class="font-bold text-white">300,000</span> KM</p>
+                        <p>ШВИДКІСТЬ: <span id="speed" class="font-bold text-white">28,000</span> KM/H</p>
+                        <p>КИСЕНЬ: <span id="oxygen" class="font-bold text-white">99</span>% <span id="oxygen-status-dot" class="status-dot status-green"></span></p>
+                        <p>ПАЛИВО: <span id="fuel" class="font-bold text-white">85</span>% <span id="fuel-status-dot" class="status-dot status-green"></span></p>
+                        <p>ТЕМП. КАБІНИ: <span id="cabin-temp" class="font-bold text-white">22</span>°C <span id="temp-status-dot" class="status-dot status-green"></span></p>
+                    </div>
+                </section>
+
+                <section id="systems-panel" class="bg-gray-700 p-3 sm:p-4 rounded-md shadow-lg">
+                    <h2 class="text-lg sm:text-xl font-semibold mb-3 text-teal-300 border-b border-gray-600 pb-2">СТАТУС СИСТЕМ</h2>
+                    <div class="space-y-2 text-xs sm:text-sm">
+                        <p>ЗВ'ЯЗОК: <span id="comms-status" class="font-bold text-green-400">НОРМА</span> <span id="comms-status-dot" class="status-dot status-green"></span></p>
+                        <p>ЖИВЛЕННЯ: <span id="power-status" class="font-bold text-green-400">СТАБІЛЬНО</span> <span id="power-status-dot" class="status-dot status-green"></span></p>
+                        <p>НАВІГАЦІЯ: <span id="nav-status" class="font-bold text-green-400">ОНЛАЙН</span> <span id="nav-status-dot" class="status-dot status-green"></span></p>
+                        <p>ЖИТТЄЗАБЕЗПЕЧЕННЯ: <span id="life-support-status" class="font-bold text-green-400">НОРМА</span> <span id="life-support-status-dot" class="status-dot status-green"></span></p>
+                    </div>
+                </section>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+                <section id="flight-path-panel" class="bg-gray-700 p-3 sm:p-4 rounded-md shadow-lg flex flex-col items-center">
+                    <h2 class="text-lg sm:text-xl font-semibold mb-3 text-teal-300 border-b border-gray-600 pb-2 w-full text-center">ТРAЄКТОРІЯ ПОЛЬОТУ</h2>
+                    <div id="flight-path-container" class="w-full h-48 md:h-56 lg:h-64 flex justify-center items-center my-2">
+                        <svg width="200" height="200" viewBox="-100 -100 200 200"> <defs>
+                                <filter id="glow">
+                                    <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+                                    <feMerge>
+                                        <feMergeNode in="coloredBlur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                                <path id="ellipticalOrbitPathDef" d="M80,0 A80,50 0 1,0 -80,0 A80,50 0 1,0 80,0 Z" fill="none"/>
+                            </defs>
+
+                            <circle cx="0" cy="0" r="25" fill="#3B82F6" filter="url(#glow)"/> <circle cx="0" cy="0" r="55" fill="none" stroke="#4A5568" stroke-width="1"/>
+                            <g id="spacecraft-orbit-group-1">
+                                <circle id="spacecraft-svg-1" cx="0" cy="-55" r="4" fill="#FBBF24"/> </g>
+
+                            <circle cx="0" cy="0" r="40" fill="none" stroke="#4A5568" stroke-width="1" stroke-dasharray="3,3"/>
+                            <g id="spacecraft-orbit-group-2">
+                                <circle id="spacecraft-svg-2" cx="0" cy="-40" r="3.5" fill="#34D399"/> </g>
+
+                            <use xlink:href="#ellipticalOrbitPathDef" stroke="#60A5FA" stroke-width="1" stroke-dasharray="5,2"/> <circle id="spacecraft-svg-3" r="3" fill="#EF4444"> <animateMotion dur="22s" repeatCount="indefinite" rotate="auto">
+                                    <mpath xlink:href="#ellipticalOrbitPathDef"/>
+                                </animateMotion>
+                            </circle>
+                        </svg>
+                    </div>
+                </section>
+
+                <section id="operations-log-panel" class="bg-gray-700 p-3 sm:p-4 rounded-md shadow-lg">
+                    <h2 class="text-lg sm:text-xl font-semibold mb-3 text-teal-300 border-b border-gray-600 pb-2">ЖУРНАЛ ОПЕРАЦІЙ</h2>
+                    <div id="operations-log" class="log-box control-panel-font">
+                        </div>
+                </section>
+            </div>
+        </div>
+
+        <div id="problem-modal" class="modal">
+            <div class="modal-content">
+                <h2 class="control-panel-font">HOUSTON, WE HAVE A PROBLEM!</h2>
+                <p id="problem-description" class="text-lg mb-4">Критична аномалія системи життєзабезпечення!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Елементи
+        const missionTimerEl = document.getElementById('mission-timer');
+        const altitudeEl = document.getElementById('altitude');
+        const speedEl = document.getElementById('speed');
+        const oxygenEl = document.getElementById('oxygen');
+        const oxygenDotEl = document.getElementById('oxygen-status-dot');
+        const fuelEl = document.getElementById('fuel');
+        const fuelDotEl = document.getElementById('fuel-status-dot');
+        const cabinTempEl = document.getElementById('cabin-temp');
+        const tempDotEl = document.getElementById('temp-status-dot');
+
+        const commsStatusEl = document.getElementById('comms-status');
+        const commsDotEl = document.getElementById('comms-status-dot');
+        const powerStatusEl = document.getElementById('power-status');
+        const powerDotEl = document.getElementById('power-status-dot');
+        const navStatusEl = document.getElementById('nav-status');
+        const navDotEl = document.getElementById('nav-status-dot');
+        const lifeSupportStatusEl = document.getElementById('life-support-status');
+        const lifeSupportDotEl = document.getElementById('life-support-status-dot');
+
+        const operationsLogEl = document.getElementById('operations-log');
+        const problemModalEl = document.getElementById('problem-modal');
+        const problemDescriptionEl = document.getElementById('problem-description');
+
+        // Початкові значення та стан
+        let missionTimeSeconds = 0;
+        let telemetry = {
+            altitude: 300000,
+            speed: 28000,
+            oxygen: 99,
+            fuel: 85,
+            cabinTemp: 22
+        };
+        let systems = {
+            comms: { status: 'НОРМА', class: 'status-green', textClass: 'text-green-400' },
+            power: { status: 'СТАБІЛЬНО', class: 'status-green', textClass: 'text-green-400' },
+            nav: { status: 'ОНЛАЙН', class: 'status-green', textClass: 'text-green-400' },
+            lifeSupport: { status: 'НОРМА', class: 'status-green', textClass: 'text-green-400' }
+        };
+        let problemOccurred = false;
+        let problemHandlingInProgress = false; 
+        let problemInterval; 
+
+        // --- Функції ---
+
+        function logMessage(message, type = 'info') {
+            const p = document.createElement('p');
+            const timestamp = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            p.innerHTML = `[${timestamp}] ${message}`;
+            if (type === 'warning') p.className = 'log-warning';
+            else if (type === 'error') p.className = 'log-error';
+            else if (type === 'system') p.className = 'log-system';
+            else if (type === 'success') p.className = 'log-success';
+            else p.className = 'log-info';
+            
+            operationsLogEl.appendChild(p);
+            operationsLogEl.scrollTop = operationsLogEl.scrollHeight; 
+        }
+
+        function updateTimer() {
+            missionTimeSeconds++;
+            const hours = Math.floor(missionTimeSeconds / 3600);
+            const minutes = Math.floor((missionTimeSeconds % 3600) / 60);
+            const seconds = missionTimeSeconds % 60;
+            missionTimerEl.textContent = `ЧАС МІСІЇ: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function updateTelemetry() {
+            if (problemHandlingInProgress) { 
+                if (telemetry.oxygen > 10 && systems.lifeSupport.status === 'КРИТИЧНО') telemetry.oxygen = Math.max(10, telemetry.oxygen - 1);
+                if (telemetry.fuel > 5 && systems.power.status === 'КРИТИЧНО') telemetry.fuel = Math.max(5, telemetry.fuel -1);
+            } else if (!problemOccurred) { 
+                telemetry.altitude += Math.floor(Math.random() * 200) - 100; 
+                telemetry.speed += Math.floor(Math.random() * 100) - 50;
+                
+                if (Math.random() < 0.02 && telemetry.oxygen > 20) telemetry.oxygen -=1; 
+                else if (Math.random() < 0.05 && telemetry.oxygen < 99) telemetry.oxygen +=1;
+
+                if (Math.random() < 0.015 && telemetry.fuel > 10) telemetry.fuel -=1; 
+                
+                telemetry.cabinTemp += (Math.random() * 0.6 - 0.3); 
+            }
+            altitudeEl.textContent = telemetry.altitude.toLocaleString('uk-UA');
+            speedEl.textContent = telemetry.speed.toLocaleString('uk-UA');
+            
+            oxygenEl.textContent = telemetry.oxygen;
+            updateStatusDot(oxygenDotEl, telemetry.oxygen, 70, 30); 
+            
+            fuelEl.textContent = telemetry.fuel;
+            updateStatusDot(fuelDotEl, telemetry.fuel, 50, 20);
+
+            cabinTempEl.textContent = telemetry.cabinTemp.toFixed(1);
+            updateStatusDot(tempDotEl, telemetry.cabinTemp, 18, 28, true);
+        }
+        
+        function updateStatusDot(dotElement, value, normalThreshold, criticalThreshold, isTemp = false) {
+            dotElement.classList.remove('status-green', 'status-yellow', 'status-red');
+            if (isTemp) { 
+                 if (value >= normalThreshold && value <= criticalThreshold) {
+                    dotElement.classList.add('status-green');
+                } else if (value < normalThreshold - 5 || value > criticalThreshold + 5) {
+                    dotElement.classList.add('status-red');
+                } else {
+                    dotElement.classList.add('status-yellow');
+                }
+            } else { 
+                if (value > normalThreshold) {
+                    dotElement.classList.add('status-green');
+                } else if (value > criticalThreshold) {
+                    dotElement.classList.add('status-yellow');
+                } else {
+                    dotElement.classList.add('status-red');
+                }
+            }
+        }
+
+        function setSystemStatus(systemKey, newStatus, newClass, newTextClass, message) {
+            systems[systemKey] = { status: newStatus, class: newClass, textClass: newTextClass };
+            const statusEl = document.getElementById(`${systemKey}-status`);
+            const dotEl = document.getElementById(`${systemKey}-status-dot`);
+
+            if (statusEl && dotEl) { 
+                statusEl.textContent = newStatus;
+                statusEl.className = `font-bold ${newTextClass}`;
+                dotEl.className = `status-dot ${newClass}`;
+            }
+            if (message) logMessage(message, newClass === 'status-red' ? 'error' : (newClass === 'status-yellow' ? 'warning' : 'system'));
+        }
+        
+        function triggerProblem() {
+            if (problemOccurred || problemHandlingInProgress) return; 
+            problemOccurred = true;
+            problemHandlingInProgress = true; 
+
+            const problems = [
+                { key: 'lifeSupport', name: 'життєзабезпечення', message: "Критична помилка системи життєзабезпечення!" },
+                { key: 'power', name: 'енергопостачання', message: "Збій основного енергопостачання! Перехід на резерв!" },
+                { key: 'nav', name: 'навігації', message: "Втрата основного навігаційного сигналу! Активна резервна система." },
+                { key: 'comms', name: 'зв\'язку', message: "Серйозні перешкоди на основному каналі зв'язку!"}
+            ];
+            const currentProblem = problems[Math.floor(Math.random() * problems.length)];
+
+            problemDescriptionEl.textContent = currentProblem.message;
+            problemModalEl.classList.add('active');
+            logMessage(`УВАГА! ${currentProblem.message.toUpperCase()}`, 'error');
+
+            setSystemStatus(currentProblem.key, 'КРИТИЧНО', 'status-red', 'text-red-400');
+            Object.keys(systems).forEach(key => {
+                if (key !== currentProblem.key && systems[key].status === 'НОРМА') {
+                     if (Math.random() < 0.3) { 
+                        setSystemStatus(key, 'ПОПЕРЕДЖЕННЯ', 'status-yellow', 'text-yellow-400');
+                     }
+                }
+            });
+            
+            if (currentProblem.key === 'lifeSupport') {
+                telemetry.oxygen = Math.min(telemetry.oxygen, 40);
+                telemetry.cabinTemp = Math.random() > 0.5 ? 8 : 38;
+            } else if (currentProblem.key === 'power') {
+                telemetry.fuel = Math.min(telemetry.fuel, 15);
+            }
+            updateTelemetry();
+
+            let countdown = 10 + Math.floor(Math.random() * 5); 
+            if(problemInterval) clearInterval(problemInterval); 
+            problemInterval = setInterval(() => {
+                if (countdown > 0) {
+                    logMessage(`Автоматичний аварійний протокол для '${currentProblem.name}' активується через ${countdown}...`, 'warning');
+                    countdown--;
+                } else {
+                    clearInterval(problemInterval);
+                    initiateEmergencyProtocol(currentProblem.name); 
+                }
+            }, 1500); 
+        }
+
+        function initiateEmergencyProtocol(problemName) {
+            if (!problemOccurred) return;
+            logMessage(`АКТИВАЦІЯ АВАРІЙНОГО ПРОТОКОЛУ для '${problemName}'...`, 'system');
+            
+            setTimeout(() => {
+                problemModalEl.classList.remove('active');
+                
+                Object.keys(systems).forEach(key => {
+                    setSystemStatus(key, 'НОРМА', 'status-green', 'text-green-400', `Система ${key.toUpperCase()}: відновлено, статус НОРМА.`);
+                });
+
+                telemetry.oxygen = 90 + Math.floor(Math.random() * 10);
+                telemetry.fuel = 75 + Math.floor(Math.random() * 15);
+                telemetry.cabinTemp = 20 + Math.floor(Math.random() * 5);
+                updateTelemetry(); 
+
+                logMessage(`Аварійний протокол для '${problemName}' виконано. Системи стабілізовані.`, 'success');
+                problemOccurred = false; 
+                problemHandlingInProgress = false; 
+            }, 3000 + Math.random() * 2000); 
+        }
+        
+        function automateSystemReport() {
+            if (problemOccurred || problemHandlingInProgress) return;
+            logMessage("Автоматичний запит статусу систем...", 'info');
+            setTimeout(() => {
+                logMessage("--- АВТО-ЗВІТ ПРО СТАТУС СИСТЕМ ---", 'system');
+                Object.keys(systems).forEach(key => {
+                     logMessage(`${key.toUpperCase()}: ${systems[key].status}`, 'system');
+                });
+                logMessage("--- Кінець авто-звіту ---", 'system');
+            }, 500 + Math.random() * 1000);
+        }
+
+        function automateCommStatus() {
+            if (problemOccurred || problemHandlingInProgress) return;
+            logMessage("Автоматична перевірка каналу зв'язку...", 'info');
+            const oldStatus = systems.comms.status;
+            setSystemStatus('comms', 'ПЕРЕВІРКА...', 'status-yellow', 'text-yellow-400');
+            setTimeout(() => {
+                if (Math.random() < 0.1) {
+                     setSystemStatus('comms', 'ПЕРЕШКОДИ', 'status-yellow', 'text-yellow-400', "Виявлено незначні перешкоди на каналі зв'язку.");
+                } else {
+                    setSystemStatus('comms', 'НОРМА', 'status-green', 'text-green-400', "Канал зв'язку чистий.");
+                }
+            }, 1500 + Math.random() * 1500);
+        }
+
+        function automateDiagnostics() {
+            if (problemOccurred || problemHandlingInProgress) return;
+            logMessage("Планова автоматична діагностика систем...", 'info');
+            const allSystems = ['power', 'nav', 'lifeSupport']; 
+            let diagnosticsComplete = 0;
+
+            allSystems.forEach((sysKey, index) => {
+                setTimeout(() => {
+                    if (Math.random() < 0.05 && systems[sysKey].status === 'НОРМА') {
+                         setSystemStatus(sysKey, 'ПОПЕРЕДЖЕННЯ', 'status-yellow', 'text-yellow-400', `Авто-діагностика ${sysKey.toUpperCase()}: виявлено тимчасову аномалію.`);
+                         setTimeout(() => { 
+                            setSystemStatus(sysKey, 'НОРМА', 'status-green', 'text-green-400', `Авто-діагностика ${sysKey.toUpperCase()}: аномалію усунуто, система в нормі.`);
+                         }, 5000 + Math.random() * 3000);
+                    } else if (systems[sysKey].status !== 'КРИТИЧНО') { 
+                         logMessage(`Авто-діагностика ${sysKey.toUpperCase()}: OK.`, 'system');
+                    }
+                    diagnosticsComplete++;
+                    if (diagnosticsComplete === allSystems.length) {
+                         logMessage("Планову авто-діагностику завершено.", 'success');
+                    }
+                }, (index + 1) * (2000 + Math.random() * 1000));
+            });
+        }
+
+        function initMissionControlDemo() {
+            logMessage("Ініціалізація ДЕМО Центру Управління Польотами...", 'system');
+            setInterval(updateTimer, 1000);
+            setInterval(updateTelemetry, 2500); 
+
+            Object.keys(systems).forEach(key => { 
+                setSystemStatus(key, systems[key].status, systems[key].class, systems[key].textClass);
+            });
+            
+            logMessage("Всі системи готові. Демонстрація місії розпочата.", 'success');
+
+            setInterval(automateSystemReport, 20000 + Math.random() * 10000); 
+            setInterval(automateCommStatus, 25000 + Math.random() * 10000);    
+            setInterval(automateDiagnostics, 45000 + Math.random() * 15000);   
+            
+            function scheduleProblemTrigger() {
+                const delay = (60000 + Math.random() * 120000); 
+                setTimeout(() => {
+                    if (!problemOccurred && !problemHandlingInProgress) { 
+                         triggerProblem();
+                    }
+                    scheduleProblemTrigger(); 
+                }, delay);
+            }
+            scheduleProblemTrigger(); 
+        }
+
+        window.onload = initMissionControlDemo;
+    </script>
+</body>
+</html>
+<link rel="stylesheet" href="index.css">
+<script src="index.tsx" type="module"></script>

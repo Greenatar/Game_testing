@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ельфійське Королівство - Клікер</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
+        }
+        .btn {
+            @apply px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed;
+        }
+        .btn-upgrade {
+            @apply px-4 py-2 bg-yellow-500 text-gray-800 rounded-lg shadow-md hover:bg-yellow-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed;
+        }
+        .building-card {
+            @apply bg-green-100 p-4 rounded-lg shadow-sm border border-green-300;
+        }
+        #oak-image {
+            max-width: 100%;
+            height: auto;
+            min-height: 200px; /* Ensure a minimum height for placeholder */
+        }
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .stat-bubble {
+            @apply bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm shadow;
+        }
+    </style>
+</head>
+<body class="bg-green-50 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4 selection:bg-yellow-300 selection:text-yellow-900">
+
+    <div id="game-container" class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-2xl p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl sm:text-4xl font-bold text-green-700">Ельфійське Королівство</h1>
+            <p class="text-green-600">Виростіть Великий Дуб і врятуйте ліс!</p>
+        </header>
+
+        <div id="stats-bar" class="flex flex-wrap justify-around items-center mb-6 gap-2 sm:gap-4 p-3 bg-green-50 rounded-lg shadow">
+            <span class="stat-bubble">Бурштин: <span id="amber-count" class="font-semibold">0</span></span>
+            <span class="stat-bubble">За секунду: <span id="aps-count" class="font-semibold">0.0</span></span>
+            <span class="stat-bubble">Рівень Дуба: <span id="oak-level-display" class="font-semibold">1</span>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-6 mb-6">
+            <div id="oak-area" class="flex-1 flex flex-col items-center bg-green-100 p-4 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold text-green-700 mb-2">Великий Дуб</h2>
+                <img id="oak-image" src="https://placehold.co/200x300/8FBC8F/3A5F0B?text=Паросток+Дуба" alt="Зображення Дуба" class="rounded-lg mb-4 shadow-sm max-h-60 sm:max-h-80 object-contain">
+                <button id="upgrade-oak-button" class="btn-upgrade w-full text-sm sm:text-base">
+                    Покращити Дуб (<span id="oak-upgrade-cost-display">50</span> <span class="text-xs">бурштину</span>)
+                </button>
+            </div>
+
+            <div class="flex-1 flex flex-col gap-6">
+                <div id="click-area" class="bg-yellow-50 p-6 rounded-lg shadow-md flex flex-col items-center">
+                    <h2 class="text-xl font-semibold text-yellow-700 mb-3">Збір Бурштину</h2>
+                    <button id="click-button" class="btn px-6 py-3 text-lg w-full max-w-xs">
+                        Зібрати +<span id="click-value">1</span> бурштину
+                    </button>
+                     <p class="text-xs text-yellow-600 mt-2">Кожен клік дає бурштин!</p>
+                </div>
+
+                <div id="kingdom-area" class="bg-lime-50 p-4 rounded-lg shadow-md flex-grow">
+                    <h3 class="text-lg font-semibold text-lime-700 mb-2 text-center">Ваше Королівство</h3>
+                    <div id="purchased-buildings-display" class="text-sm text-lime-600 space-y-1 text-center">
+                        <p class="italic">Поки що порожньо. Будуйте, щоб побачити свої володіння!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="buildings-panel" class="mb-6">
+            <h2 class="text-2xl font-semibold text-green-700 mb-4 text-center">Доступні Будівлі</h2>
+            <div id="building-buttons-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+                </div>
+        </div>
+        
+        <div id="message-area" class="text-center p-4" style="display:none;">
+             <div id="win-message-content" class="bg-yellow-400 text-yellow-900 p-6 rounded-lg shadow-xl">
+                <h2 class="text-2xl sm:text-3xl font-bold mb-2">🎉 Вітаємо! 🎉</h2>
+                <p class="text-lg">Ви виростили Великий Дуб до максимального рівня!</p>
+                <p class="mt-4">Ваше Ельфійське Королівство процвітає завдяки вашій мудрості та наполегливості!</p>
+                <button onclick="resetGameConfirmed()" class="mt-6 btn bg-green-700 hover:bg-green-800 text-white">Грати Знову</button>
+            </div>
+             <div id="reset-confirmation-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4" style="display:none;">
+                <div class="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm">
+                    <h3 class="text-xl font-semibold mb-4">Скинути гру?</h3>
+                    <p class="mb-6">Весь ваш прогрес буде втрачено. Ви впевнені?</p>
+                    <div class="flex justify-center gap-4">
+                        <button id="confirm-reset-btn" class="btn bg-red-500 hover:bg-red-600 text-white">Так, скинути</button>
+                        <button id="cancel-reset-btn" class="btn bg-gray-300 hover:bg-gray-400 text-gray-800">Скасувати</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-8 text-center text-sm text-gray-500">
+        <p>&copy; 2024 Ельфійський Клікер. Створено з любов'ю до лісу.</p>
+    </footer>
+
+    <script>
+        // Game State Variables
+        let amber = 0;
+        let amberPerSecond = 0;
+        let clickValue = 1;
+
+        const oak = {
+            level: 1,
+            maxLevel: 5,
+            images: [
+                "https://www.mkmm.org.ua/upload/medialibrary/4c6/4c67d613784732ab7c8df231e7997d07.png?text=Паросток+Дуба%0A(Рівень+1)",
+                "https://www.mkmm.org.ua//upload/medialibrary/54a/54a34920ac0ff3162dc57bcf16832bf4.png?text=Молоде+Деревце%0A(Рівень+2)",
+                "https://www.mkmm.org.ua/upload/medialibrary/384/38420adc80253a699cc9ae5a89bc6b4f.png?text=Молодий+Дуб%0A(Рівень+3)",
+                "https://www.mkmm.org.ua/upload/medialibrary/ac1/ac18181b5c670bd640c2cfff6504d408.png?text=Зрілий+Дуб%0A(Рівень+4)",
+                "https://www.mkmm.org.ua/upload/medialibrary/84c/84ca887f24f7744944736f7d3f5b4bd9.png?text=Древній+Дуб!%0A(Рівень+5)"
+            ],
+            // Cost to upgrade TO this level (index 0 is for level 1, which is free)
+            upgradeCosts: [0, 50, 250, 1000, 5000] 
+        };
+
+        const buildings = [
+            {
+                id: "fireflyFarm",
+                name: "Світлячкова Ферма",
+                cost: 10,
+                baseCost: 10,
+                aps: 0.1,
+                description: "Маленькі світлячки збирають дрібні частинки бурштину.",
+                count: 0,
+                icon: "💡"
+            },
+            {
+                id: "elvenSpring",
+                name: "Джерело Ельфійської Магії",
+                cost: 100,
+                baseCost: 100,
+                aps: 1,
+                description: "Джерело насичує землю магією, що сприяє росту бурштину.",
+                count: 0,
+                icon: "💧"
+            },
+            {
+                id: "amberWorkshop",
+                name: "Бурштинова Майстерня",
+                cost: 500,
+                baseCost: 500,
+                aps: 5,
+                description: "Ельфи-майстри обробляють бурштин, збільшуючи його кількість.",
+                count: 0,
+                icon: "🛠️"
+            },
+            {
+                id: "singingGrove",
+                name: "Гай Співучих Дерев",
+                cost: 2000,
+                baseCost: 2000,
+                aps: 20,
+                description: "Древні дерева співають пісні, що притягують бурштин.",
+                count: 0,
+                icon: "🌳"
+            }
+        ];
+
+        // DOM Elements
+        const amberCountEl = document.getElementById('amber-count');
+        const apsCountEl = document.getElementById('aps-count');
+        const oakLevelDisplayEl = document.getElementById('oak-level-display');
+        const oakImageEl = document.getElementById('oak-image');
+        const upgradeOakButtonEl = document.getElementById('upgrade-oak-button');
+        const oakUpgradeCostDisplayEl = document.getElementById('oak-upgrade-cost-display');
+        const clickButtonEl = document.getElementById('click-button');
+        const clickValueEl = document.getElementById('click-value');
+        const buildingButtonsContainerEl = document.getElementById('building-buttons-container');
+        const purchasedBuildingsDisplayEl = document.getElementById('purchased-buildings-display');
+        const messageAreaEl = document.getElementById('message-area');
+        const winMessageContentEl = document.getElementById('win-message-content');
+        const resetConfirmationModalEl = document.getElementById('reset-confirmation-modal');
+        const confirmResetBtnEl = document.getElementById('confirm-reset-btn');
+        const cancelResetBtnEl = document.getElementById('cancel-reset-btn');
+
+
+        // --- Game Logic Functions ---
+
+        function formatNumber(num) {
+            if (num < 1000) return num.toFixed(1).replace(/\.0$/, ''); // Show 1 decimal for < 1000, unless it's .0
+            if (num < 1000000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+            if (num < 1000000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
+        }
+        
+        function updateDisplay() {
+            amberCountEl.textContent = formatNumber(amber);
+            apsCountEl.textContent = formatNumber(amberPerSecond);
+            oakLevelDisplayEl.textContent = `${oak.level}/${oak.maxLevel}`;
+            oakImageEl.src = oak.images[oak.level - 1];
+            oakImageEl.alt = `Дуб, Рівень ${oak.level}`;
+            clickValueEl.textContent = formatNumber(clickValue);
+
+            // Update Oak upgrade button
+            if (oak.level < oak.maxLevel) {
+                upgradeOakButtonEl.disabled = amber < oak.upgradeCosts[oak.level];
+                oakUpgradeCostDisplayEl.textContent = formatNumber(oak.upgradeCosts[oak.level]);
+                upgradeOakButtonEl.style.display = 'block';
+            } else {
+                upgradeOakButtonEl.disabled = true;
+                upgradeOakButtonEl.textContent = "Дуб на максимальному рівні!";
+                upgradeOakButtonEl.style.display = 'block'; // Keep it visible but indicate maxed
+            }
+
+            // Update building buttons
+            buildings.forEach(building => {
+                const button = document.getElementById(`buy-${building.id}`);
+                if (button) {
+                    button.disabled = amber < building.cost;
+                    button.querySelector('.building-cost').textContent = formatNumber(building.cost);
+                    button.querySelector('.building-count').textContent = building.count > 0 ? ` (x${building.count})` : '';
+                }
+            });
+            
+            // Update purchased buildings display
+            const purchased = buildings.filter(b => b.count > 0);
+            if (purchased.length > 0) {
+                purchasedBuildingsDisplayEl.innerHTML = purchased.map(b => 
+                    `<p>${b.icon} ${b.name}: ${b.count}</p>`
+                ).join('');
+            } else {
+                purchasedBuildingsDisplayEl.innerHTML = `<p class="italic">Поки що порожньо. Будуйте, щоб побачити свої володіння!</p>`;
+            }
+        }
+
+        function collectAmber() {
+            if (oak.level >= oak.maxLevel) return; // Stop collecting if game won
+            amber += clickValue;
+            updateDisplay();
+        }
+
+        function buyBuilding(buildingId) {
+            if (oak.level >= oak.maxLevel) return; 
+            const building = buildings.find(b => b.id === buildingId);
+            if (building && amber >= building.cost) {
+                amber -= building.cost;
+                building.count++;
+                amberPerSecond += building.aps;
+                // Increase cost for next purchase (e.g., by 15%)
+                building.cost = Math.ceil(building.baseCost * Math.pow(1.15, building.count));
+                updateDisplay();
+            }
+        }
+
+        function upgradeOak() {
+            if (oak.level < oak.maxLevel && amber >= oak.upgradeCosts[oak.level]) {
+                amber -= oak.upgradeCosts[oak.level];
+                oak.level++;
+                updateDisplay();
+                checkWinCondition();
+            }
+        }
+
+        function gameLoop() {
+            if (oak.level >= oak.maxLevel && messageAreaEl.style.display === 'none') { // Check if win message not yet shown
+                // This ensures APS stops accumulating visibly after win, but loop continues for potential UI updates
+            } else if (oak.level < oak.maxLevel) {
+                 amber += amberPerSecond / 10; // Update 10 times per second for smoother display
+            }
+            updateDisplay();
+        }
+        
+        function checkWinCondition() {
+            if (oak.level >= oak.maxLevel) {
+                messageAreaEl.style.display = 'block';
+                winMessageContentEl.style.display = 'block'; // Show win message
+                resetConfirmationModalEl.style.display = 'none'; // Hide reset modal if it was open
+                // Optionally, disable all game interaction buttons except reset
+                clickButtonEl.disabled = true;
+                upgradeOakButtonEl.disabled = true;
+                buildings.forEach(building => {
+                    const button = document.getElementById(`buy-${building.id}`);
+                    if (button) button.disabled = true;
+                });
+            }
+        }
+
+        function initializeBuildings() {
+            buildings.forEach(building => {
+                const button = document.createElement('button');
+                button.id = `buy-${building.id}`;
+                button.classList.add('btn', 'building-card', 'w-full', 'text-left', 'flex', 'flex-col', 'justify-between', 'h-full');
+                button.innerHTML = `
+                    <div>
+                        <h3 class="text-md sm:text-lg font-semibold text-green-800">${building.icon} ${building.name} <span class="building-count text-xs"></span></h3>
+                        <p class="text-xs sm:text-sm text-green-600 mb-1">${building.description}</p>
+                        <p class="text-xs sm:text-sm text-green-700">Дає: ${formatNumber(building.aps)} бурштину/сек</p>
+                    </div>
+                    <p class="text-sm sm:text-base font-semibold text-green-900 mt-2">Вартість: <span class="building-cost">${formatNumber(building.cost)}</span> бурштину</p>
+                `;
+                button.onclick = () => buyBuilding(building.id);
+                buildingButtonsContainerEl.appendChild(button);
+            });
+        }
+        
+        function resetGame() {
+            amber = 0;
+            amberPerSecond = 0;
+            oak.level = 1;
+            buildings.forEach(b => {
+                b.count = 0;
+                b.cost = b.baseCost; // Reset cost to base cost
+            });
+            messageAreaEl.style.display = 'none';
+            winMessageContentEl.style.display = 'none';
+            resetConfirmationModalEl.style.display = 'none';
+            
+            // Re-enable buttons
+            clickButtonEl.disabled = false;
+            // upgradeOakButtonEl will be handled by updateDisplay
+
+            initializeBuildings(); // Re-initialize to reset counts on buttons if needed, or just rely on updateDisplay
+            updateDisplay(); // Crucial to refresh UI
+        }
+
+        function resetGameConfirmed() {
+            resetConfirmationModalEl.style.display = 'flex';
+        }
+
+        // --- Event Listeners ---
+        clickButtonEl.addEventListener('click', collectAmber);
+        upgradeOakButtonEl.addEventListener('click', upgradeOak);
+        
+        confirmResetBtnEl.addEventListener('click', () => {
+            resetGame();
+        });
+
+        cancelResetBtnEl.addEventListener('click', () => {
+            resetConfirmationModalEl.style.display = 'none';
+            // If game was won, re-show win message if reset is cancelled
+            if (oak.level >= oak.maxLevel) {
+                 messageAreaEl.style.display = 'block';
+                 winMessageContentEl.style.display = 'block';
+            }
+        });
+
+        // --- Game Initialization ---
+        initializeBuildings();
+        updateDisplay(); // Initial display update
+        setInterval(gameLoop, 100); // Game loop runs 10 times per second
+
+        // Save and Load (Optional - using localStorage for simplicity)
+        // For a more robust solution, especially in Google AI Studio context, consider alternatives if needed.
+        function saveGame() {
+            const gameState = {
+                amber,
+                amberPerSecond,
+                oakLevel: oak.level,
+                buildings: buildings.map(b => ({ id: b.id, count: b.count, cost: b.cost }))
+            };
+            localStorage.setItem('elfClickerGameState', JSON.stringify(gameState));
+            console.log("Гра збережена!");
+        }
+
+        function loadGame() {
+            const savedState = localStorage.getItem('elfClickerGameState');
+            if (savedState) {
+                const gameState = JSON.parse(savedState);
+                amber = gameState.amber;
+                // Recalculate APS based on loaded building counts
+                amberPerSecond = 0;
+                gameState.buildings.forEach(savedBuilding => {
+                    const gameBuilding = buildings.find(b => b.id === savedBuilding.id);
+                    if (gameBuilding) {
+                        gameBuilding.count = savedBuilding.count;
+                        gameBuilding.cost = savedBuilding.cost; // Restore dynamic cost
+                        amberPerSecond += gameBuilding.aps * gameBuilding.count;
+                    }
+                });
+                oak.level = gameState.oakLevel;
+                console.log("Гра завантажена!");
+            }
+            // Re-initialize building buttons to reflect loaded counts and costs correctly
+            buildingButtonsContainerEl.innerHTML = ''; // Clear existing buttons
+            initializeBuildings(); // Recreate them with loaded data
+            updateDisplay();
+            checkWinCondition(); // Check if game was already won
+        }
+        
+        // Load game on page load
+        window.onload = () => {
+            loadGame();
+             // Add an interval to auto-save the game every 30 seconds
+            setInterval(saveGame, 30000); // Save every 30 seconds
+        };
+
+        // Warn user before leaving page if they have unsaved progress (basic example)
+        // window.addEventListener('beforeunload', function (e) {
+        //     // Check if there's progress to save or if game is in a state that warrants a warning
+        //     if (amber > 0 || oak.level > 1) {
+        //         saveGame(); // Auto-save on trying to leave
+        //         // Standard browser confirmation for leaving the page
+        //         // e.preventDefault(); // Uncomment if you want to force a browser confirm dialog
+        //         // e.returnValue = ''; // Uncomment for browser confirm dialog
+        //     }
+        // });
+
+    </script>
+</body>
+</html><link rel="stylesheet" href="index.css">
+<script src="index.tsx" type="module"></script>

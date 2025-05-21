@@ -1,0 +1,6 @@
+{
+  "name": "Palantir Vision - YouTube Viewer",
+  "description": "An application for watching YouTube videos through a mystical Palantir interface, inspired by Orthanc from The Lord of the Rings. Enter a YouTube video URL or ID to gaze into its depths.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
